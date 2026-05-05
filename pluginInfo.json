@@ -1,0 +1,23 @@
+{
+  "repoName": "fpp-plugin-meross-direct",
+  "name": "Meross Direct Control",
+  "author": "Bill Tews + GitHub Copilot",
+  "description": "Direct Meross smart-device control commands for Falcon Player command presets and playlist actions.",
+  "homeURL": "https://github.com/btews68/fpp-plugin-meross-direct",
+  "srcURL": "https://github.com/btews68/fpp-plugin-meross-direct.git",
+  "bugURL": "https://github.com/btews68/fpp-plugin-meross-direct/issues",
+  "allowUpdates": 1,
+  "versions": [
+    {
+      "minFPPVersion": "9.0",
+      "maxFPPVersion": "0",
+      "branch": "main",
+      "sha": "",
+      "dependencies": {
+        "packages": [
+          "python3-pip"
+        ]
+      }
+    }
+  ]
+}

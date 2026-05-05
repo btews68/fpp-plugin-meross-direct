@@ -1,0 +1,7 @@
+[
+  {
+    "name": "Meross Device Action",
+    "script": "meross_action.sh",
+    "args": []
+  }
+]
