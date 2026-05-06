@@ -18,6 +18,75 @@ function getEndpointsfpppluginmerossdirect() {
     return $result;
 }
 
+function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
+    $descriptorspec = array(
+        1 => array('pipe', 'w'),
+        2 => array('pipe', 'w'),
+    );
+
+    $pipes = array();
+    $process = proc_open($cmd, $descriptorspec, $pipes);
+    if (!is_resource($process)) {
+        return array(
+            'ok' => false,
+            'timeout' => false,
+            'rc' => 127,
+            'raw' => 'Unable to start command process',
+        );
+    }
+
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $stdout = '';
+    $stderr = '';
+    $start = time();
+    $timedOut = false;
+
+    while (true) {
+        $stdout .= stream_get_contents($pipes[1]);
+        $stderr .= stream_get_contents($pipes[2]);
+
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            break;
+        }
+
+        if ((time() - $start) >= $timeoutSec) {
+            $timedOut = true;
+            proc_terminate($process);
+            usleep(300000);
+            $status = proc_get_status($process);
+            if ($status['running']) {
+                proc_terminate($process, 9);
+            }
+            break;
+        }
+
+        usleep(100000);
+    }
+
+    $stdout .= stream_get_contents($pipes[1]);
+    $stderr .= stream_get_contents($pipes[2]);
+
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    $rc = proc_close($process);
+    if ($timedOut) {
+        $rc = 124;
+    }
+
+    $raw = trim($stdout . (($stdout !== '' && $stderr !== '') ? "\n" : '') . $stderr);
+
+    return array(
+        'ok' => true,
+        'timeout' => $timedOut,
+        'rc' => $rc,
+        'raw' => $raw,
+    );
+}
+
 function fpppluginmerossdirectEnsureDependencies() {
     global $settings;
 
@@ -39,12 +108,20 @@ function fpppluginmerossdirectEnsureDependencies() {
     }
 
     $cmd = 'bash ' . escapeshellarg($installScript) . ' 2>&1';
-    $output = array();
-    $rc = 0;
-    exec($cmd, $output, $rc);
-    $raw = implode("\n", $output);
+    $run = fpppluginmerossdirectRunCommand($cmd, 180);
+    $rc = $run['rc'];
+    $raw = $run['raw'];
 
     clearstatcache();
+    if ($run['timeout']) {
+        return array(
+            'ok' => false,
+            'error' => 'Dependency install timed out after 180 seconds',
+            'rc' => $rc,
+            'output' => $raw,
+        );
+    }
+
     if ($rc !== 0 || !is_dir($moduleDir)) {
         return array(
             'ok' => false,
@@ -69,10 +146,13 @@ function fpppluginmerossdirectDevices() {
     $script = $settings['pluginDirectory'] . '/' . $plugin . '/commands/meross_control.py';
     $cmd    = 'python3 ' . escapeshellarg($script) . ' --list 2>&1';
 
-    $output = array();
-    $rc     = 0;
-    exec($cmd, $output, $rc);
-    $raw = implode("\n", $output);
+    $run = fpppluginmerossdirectRunCommand($cmd, 60);
+    $rc = $run['rc'];
+    $raw = $run['raw'];
+
+    if ($run['timeout']) {
+        return json(array('ok' => false, 'error' => 'Device discovery timed out after 60 seconds', 'rc' => 124, 'output' => $raw));
+    }
 
     if ($rc != 0) {
         return json(array('ok' => false, 'error' => $raw, 'rc' => $rc));
@@ -127,10 +207,13 @@ function fpppluginmerossdirectRun() {
 
     $cmd = 'bash ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
 
-    $output = array();
-    $rc     = 0;
-    exec($cmd, $output, $rc);
-    $raw = implode("\n", $output);
+    $run = fpppluginmerossdirectRunCommand($cmd, 45);
+    $rc = $run['rc'];
+    $raw = $run['raw'];
+
+    if ($run['timeout']) {
+        return json(array('ok' => false, 'error' => 'Device action timed out after 45 seconds', 'rc' => 124, 'output' => $raw));
+    }
 
     $decoded = json_decode($raw, true);
     if ($decoded !== null) {

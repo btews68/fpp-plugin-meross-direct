@@ -86,6 +86,7 @@ $pluginName = 'fpp-plugin-meross-direct';
 <script>
 (function () {
   const plugin = '<?php echo $pluginName; ?>';
+  const REQUEST_TIMEOUT_MS = 70000;
   let discoveredDevices = [];
   const discoveredDevicesKey = 'MEROSS_DISCOVERED_DEVICES';
   const aliasesKey = 'MEROSS_DEVICE_ALIASES';
@@ -113,6 +114,27 @@ $pluginName = 'fpp-plugin-meross-direct';
       body: value
     });
     return await resp.json();
+  }
+
+  async function fetchJsonWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { ...options, signal: controller.signal });
+      const text = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        throw new Error(`Invalid response (HTTP ${resp.status}): ${text.slice(0, 200)}`);
+      }
+      if (!resp.ok) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+      }
+      return data;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   function showStatus(obj) {
@@ -292,10 +314,13 @@ $pluginName = 'fpp-plugin-meross-direct';
   }
 
   async function discoverDevices() {
-    showStatus('Discovering devices... (this may take 10-20 seconds)');
+    const discoverBtn = document.getElementById('discoverBtn');
+    const originalText = discoverBtn.textContent;
+    discoverBtn.disabled = true;
+    discoverBtn.textContent = 'Discovering...';
+    showStatus('Discovering devices... (timeout: 70s)');
     try {
-      const resp = await fetch(`api/plugin/${plugin}/devices`);
-      const data = await resp.json();
+      const data = await fetchJsonWithTimeout(`api/plugin/${plugin}/devices`);
       if (!data.ok) { showStatus({ ok: false, error: data.error || 'Discovery failed', details: data }); return; }
       discoveredDevices = data.devices || [];
       await setSetting(discoveredDevicesKey, JSON.stringify(discoveredDevices));
@@ -303,7 +328,14 @@ $pluginName = 'fpp-plugin-meross-direct';
       populateQuickSelect(discoveredDevices);
       showStatus({ ok: true, message: `Found ${discoveredDevices.length} device(s).` });
     } catch (err) {
-      showStatus(`Discovery error: ${err}`);
+      if (err && err.name === 'AbortError') {
+        showStatus('Discovery timed out after 70 seconds. Check region, internet access, and dependency install status.');
+      } else {
+        showStatus(`Discovery error: ${err}`);
+      }
+    } finally {
+      discoverBtn.disabled = false;
+      discoverBtn.textContent = originalText;
     }
   }
 
@@ -328,15 +360,18 @@ $pluginName = 'fpp-plugin-meross-direct';
     if (value !== undefined && value !== '') body.value = String(value);
     showStatus(`Sending ${action}${value !== undefined ? ' ' + value : ''}...`);
     try {
-      const resp = await fetch(`api/plugin/${plugin}/run`, {
+      const data = await fetchJsonWithTimeout(`api/plugin/${plugin}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await resp.json();
       showStatus(data);
     } catch (err) {
-      showStatus(`Error: ${err}`);
+      if (err && err.name === 'AbortError') {
+        showStatus(`Error: ${action} request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds.`);
+      } else {
+        showStatus(`Error: ${err}`);
+      }
     }
   }
 
