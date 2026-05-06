@@ -47,7 +47,7 @@ def _bootstrap_meross_dependency() -> bool:
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=60)
     except Exception:
         return False
 
@@ -59,7 +59,7 @@ def _bootstrap_meross_dependency() -> bool:
     # Retry for environments that require this flag.
     cmd.insert(4, "--break-system-packages")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=60)
     except Exception:
         return False
 
@@ -206,15 +206,29 @@ def _online(device) -> str:
 
 
 async def _async_list_devices(email: str, password: str, api_url: str) -> int:
-    http_client = await MerossHttpClient.async_from_user_password(
-        api_base_url=api_url,
-        email=email,
-        password=password,
-    )
+    timeout = max(5, _safe_int(os.environ.get("MEROSS_API_TIMEOUT", "30"), 30))
+    manager = None
+
+    try:
+        http_client = await asyncio.wait_for(
+            MerossHttpClient.async_from_user_password(
+                api_base_url=api_url,
+                email=email,
+                password=password,
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        die(
+            f"Timed out connecting to Meross cloud after {timeout}s. "
+            "Check network, DNS, and MEROSS_API_REGION.",
+            6,
+        )
+
     try:
         manager = MerossManager(meross_cloud_client=http_client)
-        await manager.async_init()
-        await manager.async_device_discovery()
+        await asyncio.wait_for(manager.async_init(), timeout=timeout)
+        await asyncio.wait_for(manager.async_device_discovery(), timeout=timeout)
 
         devices = manager.find_devices()
         result = []
@@ -232,11 +246,24 @@ async def _async_list_devices(email: str, password: str, api_url: str) -> int:
                 }
             )
 
-        await manager.async_stop()
         print(json.dumps({"ok": True, "count": len(result), "devices": result}, indent=2))
         return 0
+    except asyncio.TimeoutError:
+        die(
+            f"Timed out during Meross discovery after {timeout}s. "
+            "If this persists, verify account region (us/eu/ap) and internet access from FPP.",
+            6,
+        )
     finally:
-        await http_client.async_logout()
+        if manager is not None:
+            try:
+                await manager.async_stop()
+            except Exception:
+                pass
+        try:
+            await http_client.async_logout()
+        except Exception:
+            pass
 
 
 async def _async_control(
@@ -250,40 +277,54 @@ async def _async_control(
     requested_label: str,
     alias_used: str,
 ) -> int:
-    http_client = await MerossHttpClient.async_from_user_password(
-        api_base_url=api_url,
-        email=email,
-        password=password,
-    )
+    timeout = max(5, _safe_int(os.environ.get("MEROSS_API_TIMEOUT", "30"), 30))
+    manager = None
+
+    try:
+        http_client = await asyncio.wait_for(
+            MerossHttpClient.async_from_user_password(
+                api_base_url=api_url,
+                email=email,
+                password=password,
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError:
+        die(
+            f"Timed out connecting to Meross cloud after {timeout}s. "
+            "Check network, DNS, and MEROSS_API_REGION.",
+            6,
+        )
+
     try:
         manager = MerossManager(meross_cloud_client=http_client)
-        await manager.async_init()
-        await manager.async_device_discovery()
+        await asyncio.wait_for(manager.async_init(), timeout=timeout)
+        await asyncio.wait_for(manager.async_device_discovery(), timeout=timeout)
 
         devices = manager.find_devices(device_uuids=[uuid])
         if not devices:
             die(f"Device UUID '{uuid}' not found in your Meross account.", 4)
 
         device = devices[0]
-        await device.async_update()
+        await asyncio.wait_for(device.async_update(), timeout=timeout)
 
         result_data: dict = {}
 
         if action == "on":
-            await device.async_turn_on(channel=channel)
+            await asyncio.wait_for(device.async_turn_on(channel=channel), timeout=timeout)
             result_data = {"status": "on"}
 
         elif action == "off":
-            await device.async_turn_off(channel=channel)
+            await asyncio.wait_for(device.async_turn_off(channel=channel), timeout=timeout)
             result_data = {"status": "off"}
 
         elif action == "toggle":
             is_on = device.is_on(channel=channel)
             if is_on:
-                await device.async_turn_off(channel=channel)
+                await asyncio.wait_for(device.async_turn_off(channel=channel), timeout=timeout)
                 result_data = {"status": "off", "was": "on"}
             else:
-                await device.async_turn_on(channel=channel)
+                await asyncio.wait_for(device.async_turn_on(channel=channel), timeout=timeout)
                 result_data = {"status": "on", "was": "off"}
 
         elif action == "level":
@@ -299,11 +340,14 @@ async def _async_control(
                     4,
                 )
 
-            await device.async_set_light_color(channel=channel, luminance=level)
+            await asyncio.wait_for(
+                device.async_set_light_color(channel=channel, luminance=level),
+                timeout=timeout,
+            )
             result_data = {"luminance": level}
 
         elif action == "status":
-            await device.async_update()
+            await asyncio.wait_for(device.async_update(), timeout=timeout)
             try:
                 is_on = device.is_on(channel=channel)
                 result_data["power"] = "on" if is_on else "off"
@@ -319,7 +363,6 @@ async def _async_control(
         else:
             die(f"Unknown action '{action}'. Supported: on, off, toggle, level, status", 2)
 
-        await manager.async_stop()
         print(
             json.dumps(
                 {
@@ -337,9 +380,23 @@ async def _async_control(
             )
         )
         return 0
+    except asyncio.TimeoutError:
+        die(
+            f"Timed out executing action '{action}' after {timeout}s. "
+            "Verify the device is online and reachable from Meross cloud.",
+            6,
+        )
 
     finally:
-        await http_client.async_logout()
+        if manager is not None:
+            try:
+                await manager.async_stop()
+            except Exception:
+                pass
+        try:
+            await http_client.async_logout()
+        except Exception:
+            pass
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
