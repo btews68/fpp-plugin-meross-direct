@@ -26,6 +26,26 @@ function getEndpointsfpppluginmerossdirect() {
     return $result;
 }
 
+// Extract a JSON object/array from output that may contain non-JSON log lines.
+function fpppluginmerossdirectExtractJson($str) {
+    $start = strpos($str, '{');
+    if ($start === false) {
+        $start = strpos($str, '[');
+    }
+    if ($start === false) {
+        return null;
+    }
+    $end = strrpos($str, '}');
+    $endArr = strrpos($str, ']');
+    if ($endArr !== false && $endArr > $end) {
+        $end = $endArr;
+    }
+    if ($end === false || $end < $start) {
+        return null;
+    }
+    return json_decode(substr($str, $start, $end - $start + 1), true);
+}
+
 function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
     $descriptorspec = array(
         1 => array('pipe', 'w'),
@@ -243,6 +263,9 @@ function fpppluginmerossdirectDevices() {
     }
 
     $decoded = json_decode($raw, true);
+    if ($decoded === null) {
+        $decoded = fpppluginmerossdirectExtractJson($raw);
+    }
     if ($decoded !== null) {
         return json($decoded);
     }
@@ -251,11 +274,7 @@ function fpppluginmerossdirectDevices() {
         return json(array('ok' => false, 'error' => $raw, 'rc' => $rc));
     }
 
-    if ($decoded === null) {
-        return json(array('ok' => false, 'error' => 'Unable to decode script output', 'raw' => $raw));
-    }
-
-    return json(array('ok' => false, 'error' => 'Unknown discovery response', 'raw' => $raw));
+    return json(array('ok' => false, 'error' => 'Unable to decode script output', 'details' => array('ok' => false, 'error' => 'Unable to decode script output', 'raw' => $raw)));
 }
 
 function fpppluginmerossdirectRun() {
@@ -308,6 +327,9 @@ function fpppluginmerossdirectRun() {
     }
 
     $decoded = json_decode($raw, true);
+    if ($decoded === null) {
+        $decoded = fpppluginmerossdirectExtractJson($raw);
+    }
     if ($decoded !== null) {
         return json($decoded);
     }
