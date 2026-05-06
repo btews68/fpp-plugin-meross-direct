@@ -35,7 +35,7 @@ def _try_import_meross():
 
 def _bootstrap_meross_dependency() -> bool:
     PYTHON_LIB_DIR.mkdir(parents=True, exist_ok=True)
-    cmd = [
+    base = [
         sys.executable,
         "-m",
         "pip",
@@ -43,30 +43,38 @@ def _bootstrap_meross_dependency() -> bool:
         "--upgrade",
         "--target",
         str(PYTHON_LIB_DIR),
-        "meross-iot",
     ]
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=60)
-    except Exception:
+    def _run_install(args: list[str], timeout_sec: int = 180) -> bool:
+        try:
+            result = subprocess.run(base + args, capture_output=True, text=True, check=False, timeout=timeout_sec)
+            if result.returncode == 0:
+                return True
+            result = subprocess.run(
+                base[:4] + ["--break-system-packages"] + base[4:] + args,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_sec,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    # Avoid meross-iot extras that can trigger slow source builds (brotli on armv7).
+    deps_ok = _run_install([
+        "aiohttp>=3.8,<4",
+        "requests>=2.19.1,<3",
+        "paho-mqtt>=2.1.0,<3",
+        "pycryptodomex>=3.20.0",
+    ])
+    if not deps_ok:
         return False
 
-    if result.returncode == 0:
-        if str(PYTHON_LIB_DIR) not in sys.path:
-            sys.path.insert(0, str(PYTHON_LIB_DIR))
-        return True
-
-    # Retry for environments that require this flag.
-    cmd.insert(4, "--break-system-packages")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=60)
-    except Exception:
-        return False
-
-    if result.returncode == 0 and str(PYTHON_LIB_DIR) not in sys.path:
+    pkg_ok = _run_install(["--no-deps", "meross-iot"])
+    if pkg_ok and str(PYTHON_LIB_DIR) not in sys.path:
         sys.path.insert(0, str(PYTHON_LIB_DIR))
-
-    return result.returncode == 0
+    return pkg_ok
 
 
 MerossHttpClient, MerossManager = _try_import_meross()

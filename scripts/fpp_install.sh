@@ -2,7 +2,9 @@
 
 # fpp-plugin-meross-direct install script
 
-. ${FPPDIR}/scripts/common
+if [ -n "${FPPDIR:-}" ] && [ -f "${FPPDIR}/scripts/common" ]; then
+	. "${FPPDIR}/scripts/common"
+fi
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY_LIB_DIR="$PLUGIN_DIR/python_libs"
@@ -33,7 +35,7 @@ if ! touch "$PY_LIB_DIR/.fpp_write_test" >/dev/null 2>&1; then
 fi
 rm -f "$PY_LIB_DIR/.fpp_write_test"
 
-echo "Installing Python dependency: meross-iot"
+echo "Installing Python dependencies for meross-iot"
 
 if python3 -m pip --version >/dev/null 2>&1; then
 	PIP_CMD=(python3 -m pip)
@@ -44,12 +46,28 @@ else
 	exit 1
 fi
 
-if ! "${PIP_CMD[@]}" install --upgrade --target "$PY_LIB_DIR" meross-iot; then
-	# Some systems require this flag due to externally-managed Python policy.
-	if ! "${PIP_CMD[@]}" install --break-system-packages --upgrade --target "$PY_LIB_DIR" meross-iot; then
-		echo "ERROR: Failed to install meross-iot into $PY_LIB_DIR"
-		exit 1
+install_with_optional_break_system() {
+	if "${PIP_CMD[@]}" install --upgrade --target "$PY_LIB_DIR" "$@"; then
+		return 0
 	fi
+	"${PIP_CMD[@]}" install --break-system-packages --upgrade --target "$PY_LIB_DIR" "$@"
+}
+
+# Install core deps explicitly without aiohttp speedups extras.
+# This avoids building Brotli from source on armv7, which is what caused timeouts.
+if ! install_with_optional_break_system \
+	"aiohttp>=3.8,<4" \
+	"requests>=2.19.1,<3" \
+	"paho-mqtt>=2.1.0,<3" \
+	"pycryptodomex>=3.20.0"; then
+	echo "ERROR: Failed to install base Python dependencies into $PY_LIB_DIR"
+	exit 1
+fi
+
+# Install meross-iot itself without pulling extras (aiohttp[speedups]).
+if ! install_with_optional_break_system --no-deps meross-iot; then
+	echo "ERROR: Failed to install meross-iot into $PY_LIB_DIR"
+	exit 1
 fi
 
 if ! python3 -c "import sys; sys.path.insert(0, '$PY_LIB_DIR'); from meross_iot.http_api import MerossHttpClient" >/dev/null 2>&1; then

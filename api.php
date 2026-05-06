@@ -139,9 +139,16 @@ function fpppluginmerossdirectEnsureDependencies() {
     $plugin = 'fpp-plugin-meross-direct';
     $pluginDir = $settings['pluginDirectory'] . '/' . $plugin;
     $moduleDir = $pluginDir . '/python_libs/meross_iot';
+    $pythonLib = $pluginDir . '/python_libs';
+
+    $importCmd = 'PYTHONPATH=' . escapeshellarg($pythonLib) . ' python3 -c ' .
+        escapeshellarg('from meross_iot.http_api import MerossHttpClient; print("import_ok")') . ' 2>&1';
 
     if (is_dir($moduleDir)) {
-        return array('ok' => true, 'installed' => true, 'message' => 'Dependencies already present');
+        $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
+        if (!$probe['timeout'] && $probe['rc'] === 0) {
+            return array('ok' => true, 'installed' => true, 'message' => 'Dependencies already present');
+        }
     }
 
     $installScript = $pluginDir . '/scripts/fpp_install.sh';
@@ -154,7 +161,7 @@ function fpppluginmerossdirectEnsureDependencies() {
     }
 
     $cmd = 'bash ' . escapeshellarg($installScript) . ' 2>&1';
-    $run = fpppluginmerossdirectRunCommand($cmd, 180);
+    $run = fpppluginmerossdirectRunCommand($cmd, 420);
     $rc = $run['rc'];
     $raw = $run['raw'];
 
@@ -162,18 +169,19 @@ function fpppluginmerossdirectEnsureDependencies() {
     if ($run['timeout']) {
         return array(
             'ok' => false,
-            'error' => 'Dependency install timed out after 180 seconds',
+            'error' => 'Dependency install timed out after 420 seconds',
             'rc' => $rc,
             'output' => $raw,
         );
     }
 
-    if ($rc !== 0 || !is_dir($moduleDir)) {
+    $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
+    if ($rc !== 0 || !is_dir($moduleDir) || $probe['timeout'] || $probe['rc'] !== 0) {
         return array(
             'ok' => false,
             'error' => 'Unable to install meross-iot dependency',
             'rc' => $rc,
-            'output' => $raw,
+            'output' => trim($raw . "\n" . $probe['raw']),
         );
     }
 
