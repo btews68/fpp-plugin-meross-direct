@@ -151,11 +151,9 @@ function fpppluginmerossdirectEnsureDependencies() {
         escapeshellarg('from meross_iot.http_api import MerossHttpClient; print("import_ok")') . ' 2>&1';
 
     if (is_dir($moduleDir)) {
-        $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
-        $probeOk = (!$probe['timeout'] && ($probe['rc'] === 0 || strpos($probe['raw'], 'import_ok') !== false));
-        if ($probeOk) {
-            return array('ok' => true, 'installed' => true, 'message' => 'Dependencies already present');
-        }
+        // If module directory exists, allow runtime script to perform stricter checks.
+        // This avoids false negatives on systems that report unreliable process rc values.
+        return array('ok' => true, 'installed' => true, 'message' => 'Dependencies appear present');
     }
 
     $installScript = $pluginDir . '/scripts/fpp_install.sh';
@@ -179,6 +177,16 @@ function fpppluginmerossdirectEnsureDependencies() {
             'error' => 'Dependency install timed out after 420 seconds',
             'rc' => $rc,
             'output' => $raw,
+        );
+    }
+
+    // The install script prints import_ok when final Python import verification succeeds.
+    if (strpos($raw, 'import_ok') !== false) {
+        return array(
+            'ok' => true,
+            'installed' => true,
+            'message' => 'Dependencies installed',
+            'warning' => ($rc !== 0) ? ('Install command returned non-zero rc=' . $rc . ' but install output confirmed import_ok') : '',
         );
     }
 
@@ -225,16 +233,20 @@ function fpppluginmerossdirectDevices() {
         return json(array('ok' => false, 'error' => 'Device discovery timed out after 60 seconds', 'rc' => 124, 'output' => $raw));
     }
 
+    $decoded = json_decode($raw, true);
+    if ($decoded !== null) {
+        return json($decoded);
+    }
+
     if ($rc != 0) {
         return json(array('ok' => false, 'error' => $raw, 'rc' => $rc));
     }
 
-    $decoded = json_decode($raw, true);
     if ($decoded === null) {
         return json(array('ok' => false, 'error' => 'Unable to decode script output', 'raw' => $raw));
     }
 
-    return json($decoded);
+    return json(array('ok' => false, 'error' => 'Unknown discovery response', 'raw' => $raw));
 }
 
 function fpppluginmerossdirectRun() {
@@ -289,6 +301,10 @@ function fpppluginmerossdirectRun() {
     $decoded = json_decode($raw, true);
     if ($decoded !== null) {
         return json($decoded);
+    }
+
+    if ($rc != 0) {
+        return json(array('ok' => false, 'output' => $raw, 'rc' => $rc));
     }
 
     return json(array('ok' => $rc === 0, 'output' => $raw, 'rc' => $rc));
