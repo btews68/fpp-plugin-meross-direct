@@ -21,7 +21,7 @@ if [[ "$TARGET" =~ ^\".*\"$ || "$TARGET" =~ ^\'.*\'$ ]]; then
 fi
 
 if [[ -n "$TARGET" ]]; then
-    exec "$ACTION_SCRIPT" "$TARGET" off
+    exec bash "$ACTION_SCRIPT" "$TARGET" off
 fi
 
-exec "$ACTION_SCRIPT" off
+exec bash "$ACTION_SCRIPT" off

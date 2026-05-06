@@ -36,7 +36,7 @@ if [[ -z "$LEVEL" ]]; then
 fi
 
 if [[ -n "$TARGET" ]]; then
-    exec "$ACTION_SCRIPT" "$TARGET" level "$LEVEL"
+    exec bash "$ACTION_SCRIPT" "$TARGET" level "$LEVEL"
 fi
 
-exec "$ACTION_SCRIPT" level "$LEVEL"
+exec bash "$ACTION_SCRIPT" level "$LEVEL"
