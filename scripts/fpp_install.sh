@@ -75,11 +75,11 @@ if ! python3 -c "import sys; sys.path.insert(0, '$PY_LIB_DIR'); from meross_iot.
 	exit 1
 fi
 
-chmod +x "$PLUGIN_DIR/commands/meross_action.sh"
-chmod +x "$PLUGIN_DIR/commands/meross_control.py"
-chmod +x "$PLUGIN_DIR/commands/meross_on.sh"
-chmod +x "$PLUGIN_DIR/commands/meross_off.sh"
-chmod +x "$PLUGIN_DIR/commands/meross_dim.sh"
+chmod +x "$PLUGIN_DIR/commands/meross_action.sh" 2>/dev/null || echo "WARN: unable to chmod meross_action.sh (continuing)"
+chmod +x "$PLUGIN_DIR/commands/meross_control.py" 2>/dev/null || echo "WARN: unable to chmod meross_control.py (continuing)"
+chmod +x "$PLUGIN_DIR/commands/meross_on.sh" 2>/dev/null || echo "WARN: unable to chmod meross_on.sh (continuing)"
+chmod +x "$PLUGIN_DIR/commands/meross_off.sh" 2>/dev/null || echo "WARN: unable to chmod meross_off.sh (continuing)"
+chmod +x "$PLUGIN_DIR/commands/meross_dim.sh" 2>/dev/null || echo "WARN: unable to chmod meross_dim.sh (continuing)"
 
 # Link helper scripts into FPP's scripts directory so they appear in Script dropdowns.
 mkdir -p "$FPP_SCRIPTS_DIR"

@@ -176,7 +176,16 @@ function fpppluginmerossdirectEnsureDependencies() {
     }
 
     $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
-    if ($rc !== 0 || !is_dir($moduleDir) || $probe['timeout'] || $probe['rc'] !== 0) {
+    if (!$probe['timeout'] && $probe['rc'] === 0) {
+        return array(
+            'ok' => true,
+            'installed' => true,
+            'message' => 'Dependencies installed',
+            'warning' => ($rc !== 0) ? ('Install command returned non-zero rc=' . $rc . ' but dependency import probe succeeded') : '',
+        );
+    }
+
+    if (!is_dir($moduleDir) || $probe['timeout'] || $probe['rc'] !== 0) {
         return array(
             'ok' => false,
             'error' => 'Unable to install meross-iot dependency',
