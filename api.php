@@ -86,7 +86,12 @@ function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
 
         if ((time() - $start) >= $timeoutSec) {
             $timedOut = true;
+            $status = proc_get_status($process);
+            $pid = $status['pid'] ?? null;
             proc_terminate($process);
+            if ($pid) {
+                shell_exec('kill -9 -- -' . intval($pid) . ' 2>/dev/null; pkill -9 -P ' . intval($pid) . ' 2>/dev/null');
+            }
             usleep(300000);
             $status = proc_get_status($process);
             if ($status['running']) {
@@ -319,14 +324,14 @@ function fpppluginmerossdirectRun() {
     $args[] = '--channel';
     $args[] = escapeshellarg((string)$channel);
 
-    $cmd = 'python3 ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
+    $cmd = 'MEROSS_API_TIMEOUT=30 python3 ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
 
-    $run = fpppluginmerossdirectRunCommand($cmd, 45);
+    $run = fpppluginmerossdirectRunCommand($cmd, 60);
     $rc = $run['rc'];
     $raw = $run['raw'];
 
     if ($run['timeout']) {
-        return json(array('ok' => false, 'error' => 'Device action timed out after 45 seconds', 'rc' => 124, 'output' => $raw));
+        return json(array('ok' => false, 'error' => 'Device action timed out after 60 seconds', 'rc' => 124, 'output' => $raw));
     }
 
     $decoded = json_decode($raw, true);
