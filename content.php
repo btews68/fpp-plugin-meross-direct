@@ -214,6 +214,7 @@ $pluginName = 'fpp-plugin-meross-direct';
     const alias      = document.getElementById('aliasName').value.trim();
     const selectedId = document.getElementById('quickSelectDevice').value.trim();
     if (!alias)      { showStatus('Enter a Friendly Name first.'); return; }
+    if (/\s/.test(alias)) { showStatus({ ok: false, message: 'Friendly Name cannot contain spaces — use underscores or camelCase (e.g. Porch_Light).' }); return; }
     if (!selectedId) { showStatus('Select a device first.');       return; }
 
     // quickSelectDevice value is "uuid|channel"
