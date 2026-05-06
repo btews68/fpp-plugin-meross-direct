@@ -1,5 +1,7 @@
 <?php
 
+define('MEROSS_PLUGIN_API_BUILD', '2026-05-06b');
+
 function getEndpointsfpppluginmerossdirect() {
     $result = array();
 
@@ -136,7 +138,7 @@ function fpppluginmerossdirectDiagnostics() {
     $checks['socket_eu'] = fpppluginmerossdirectSocketCheck('iotx-eu.meross.com', 443, 5);
     $checks['socket_ap'] = fpppluginmerossdirectSocketCheck('iotx-ap.meross.com', 443, 5);
 
-    return json(array('ok' => true, 'checks' => $checks));
+    return json(array('ok' => true, 'build' => MEROSS_PLUGIN_API_BUILD, 'checks' => $checks));
 }
 
 function fpppluginmerossdirectEnsureDependencies() {
@@ -153,7 +155,7 @@ function fpppluginmerossdirectEnsureDependencies() {
     if (is_dir($moduleDir)) {
         // If module directory exists, allow runtime script to perform stricter checks.
         // This avoids false negatives on systems that report unreliable process rc values.
-        return array('ok' => true, 'installed' => true, 'message' => 'Dependencies appear present');
+        return array('ok' => true, 'installed' => true, 'message' => 'Dependencies appear present', 'build' => MEROSS_PLUGIN_API_BUILD);
     }
 
     $installScript = $pluginDir . '/scripts/fpp_install.sh';
@@ -181,12 +183,17 @@ function fpppluginmerossdirectEnsureDependencies() {
     }
 
     // The install script prints import_ok when final Python import verification succeeds.
-    if (strpos($raw, 'import_ok') !== false) {
+    if (
+        strpos($raw, 'import_ok') !== false ||
+        strpos($raw, 'Successfully installed meross-iot') !== false ||
+        strpos($raw, 'Installed fpp-plugin-meross-direct') !== false
+    ) {
         return array(
             'ok' => true,
             'installed' => true,
             'message' => 'Dependencies installed',
             'warning' => ($rc !== 0) ? ('Install command returned non-zero rc=' . $rc . ' but install output confirmed import_ok') : '',
+            'build' => MEROSS_PLUGIN_API_BUILD,
         );
     }
 
@@ -198,6 +205,7 @@ function fpppluginmerossdirectEnsureDependencies() {
             'installed' => true,
             'message' => 'Dependencies installed',
             'warning' => ($rc !== 0) ? ('Install command returned non-zero rc=' . $rc . ' but dependency import probe succeeded') : '',
+            'build' => MEROSS_PLUGIN_API_BUILD,
         );
     }
 
@@ -207,10 +215,11 @@ function fpppluginmerossdirectEnsureDependencies() {
             'error' => 'Unable to install meross-iot dependency',
             'rc' => $rc,
             'output' => trim($raw . "\n" . $probe['raw']),
+            'build' => MEROSS_PLUGIN_API_BUILD,
         );
     }
 
-    return array('ok' => true, 'installed' => true, 'message' => 'Dependencies installed');
+    return array('ok' => true, 'installed' => true, 'message' => 'Dependencies installed', 'build' => MEROSS_PLUGIN_API_BUILD);
 }
 
 function fpppluginmerossdirectDevices() {
