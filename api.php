@@ -48,6 +48,7 @@ function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
     $stderr = '';
     $start = time();
     $timedOut = false;
+    $exitCode = null;
 
     while (true) {
         $stdout .= stream_get_contents($pipes[1]);
@@ -55,6 +56,9 @@ function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
 
         $status = proc_get_status($process);
         if (!$status['running']) {
+            if (isset($status['exitcode']) && $status['exitcode'] !== -1) {
+                $exitCode = (int)$status['exitcode'];
+            }
             break;
         }
 
@@ -81,6 +85,8 @@ function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
     $rc = proc_close($process);
     if ($timedOut) {
         $rc = 124;
+    } elseif ($exitCode !== null) {
+        $rc = $exitCode;
     }
 
     $raw = trim($stdout . (($stdout !== '' && $stderr !== '') ? "\n" : '') . $stderr);
@@ -146,7 +152,8 @@ function fpppluginmerossdirectEnsureDependencies() {
 
     if (is_dir($moduleDir)) {
         $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
-        if (!$probe['timeout'] && $probe['rc'] === 0) {
+        $probeOk = (!$probe['timeout'] && ($probe['rc'] === 0 || strpos($probe['raw'], 'import_ok') !== false));
+        if ($probeOk) {
             return array('ok' => true, 'installed' => true, 'message' => 'Dependencies already present');
         }
     }
@@ -176,7 +183,8 @@ function fpppluginmerossdirectEnsureDependencies() {
     }
 
     $probe = fpppluginmerossdirectRunCommand($importCmd, 10);
-    if (!$probe['timeout'] && $probe['rc'] === 0) {
+    $probeOk = (!$probe['timeout'] && ($probe['rc'] === 0 || strpos($probe['raw'], 'import_ok') !== false));
+    if ($probeOk) {
         return array(
             'ok' => true,
             'installed' => true,
@@ -185,7 +193,7 @@ function fpppluginmerossdirectEnsureDependencies() {
         );
     }
 
-    if (!is_dir($moduleDir) || $probe['timeout'] || $probe['rc'] !== 0) {
+    if (!is_dir($moduleDir) || $probe['timeout']) {
         return array(
             'ok' => false,
             'error' => 'Unable to install meross-iot dependency',
