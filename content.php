@@ -86,7 +86,7 @@ $pluginName = 'fpp-plugin-meross-direct';
 <script>
 (function () {
   const plugin = '<?php echo $pluginName; ?>';
-  const REQUEST_TIMEOUT_MS = 70000;
+  const REQUEST_TIMEOUT_MS = 240000;
   let discoveredDevices = [];
   const discoveredDevicesKey = 'MEROSS_DISCOVERED_DEVICES';
   const aliasesKey = 'MEROSS_DEVICE_ALIASES';
@@ -318,7 +318,7 @@ $pluginName = 'fpp-plugin-meross-direct';
     const originalText = discoverBtn.textContent;
     discoverBtn.disabled = true;
     discoverBtn.textContent = 'Discovering...';
-    showStatus('Discovering devices... (timeout: 70s)');
+    showStatus('Discovering devices... (timeout: up to 240s on first run while dependencies install)');
     try {
       const data = await fetchJsonWithTimeout(`api/plugin/${plugin}/devices`);
       if (!data.ok) { showStatus({ ok: false, error: data.error || 'Discovery failed', details: data }); return; }
@@ -329,7 +329,16 @@ $pluginName = 'fpp-plugin-meross-direct';
       showStatus({ ok: true, message: `Found ${discoveredDevices.length} device(s).` });
     } catch (err) {
       if (err && err.name === 'AbortError') {
-        showStatus('Discovery timed out after 70 seconds. Check region, internet access, and dependency install status.');
+        try {
+          const diag = await fetchJsonWithTimeout(`api/plugin/${plugin}/diagnostics`, {}, 30000);
+          showStatus({
+            ok: false,
+            error: `Discovery timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`,
+            diagnostics: diag,
+          });
+        } catch (diagErr) {
+          showStatus(`Discovery timed out and diagnostics failed: ${diagErr}`);
+        }
       } else {
         showStatus(`Discovery error: ${err}`);
       }

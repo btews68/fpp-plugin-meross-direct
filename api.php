@@ -15,6 +15,12 @@ function getEndpointsfpppluginmerossdirect() {
         'callback' => 'fpppluginmerossdirectRun'
     );
 
+    $result[] = array(
+        'method'   => 'GET',
+        'endpoint' => 'diagnostics',
+        'callback' => 'fpppluginmerossdirectDiagnostics'
+    );
+
     return $result;
 }
 
@@ -85,6 +91,46 @@ function fpppluginmerossdirectRunCommand($cmd, $timeoutSec = 45) {
         'rc' => $rc,
         'raw' => $raw,
     );
+}
+
+function fpppluginmerossdirectSocketCheck($host, $port = 443, $timeoutSec = 5) {
+    $errno = 0;
+    $errstr = '';
+    $t0 = microtime(true);
+    $fp = @fsockopen($host, $port, $errno, $errstr, $timeoutSec);
+    $elapsedMs = (int) round((microtime(true) - $t0) * 1000);
+
+    if ($fp) {
+        fclose($fp);
+        return array('ok' => true, 'host' => $host, 'port' => $port, 'latencyMs' => $elapsedMs);
+    }
+
+    return array('ok' => false, 'host' => $host, 'port' => $port, 'errno' => $errno, 'error' => $errstr, 'latencyMs' => $elapsedMs);
+}
+
+function fpppluginmerossdirectDiagnostics() {
+    global $settings;
+
+    $plugin = 'fpp-plugin-meross-direct';
+    $pluginDir = $settings['pluginDirectory'] . '/' . $plugin;
+    $pythonLib = $pluginDir . '/python_libs';
+    $controlScript = $pluginDir . '/commands/meross_control.py';
+
+    $checks = array();
+
+    $checks['pythonVersion'] = fpppluginmerossdirectRunCommand('python3 --version 2>&1', 8);
+
+    $importCmd = 'PYTHONPATH=' . escapeshellarg($pythonLib) . ' python3 -c ' .
+        escapeshellarg('from meross_iot.http_api import MerossHttpClient; print("import_ok")') . ' 2>&1';
+    $checks['merossImport'] = fpppluginmerossdirectRunCommand($importCmd, 10);
+
+    $checks['controlListProbe'] = fpppluginmerossdirectRunCommand('python3 ' . escapeshellarg($controlScript) . ' --list 2>&1', 25);
+
+    $checks['socket_us'] = fpppluginmerossdirectSocketCheck('iotx-us.meross.com', 443, 5);
+    $checks['socket_eu'] = fpppluginmerossdirectSocketCheck('iotx-eu.meross.com', 443, 5);
+    $checks['socket_ap'] = fpppluginmerossdirectSocketCheck('iotx-ap.meross.com', 443, 5);
+
+    return json(array('ok' => true, 'checks' => $checks));
 }
 
 function fpppluginmerossdirectEnsureDependencies() {
