@@ -12,7 +12,7 @@
       "minFPPVersion": "9.0",
       "maxFPPVersion": "0",
       "branch": "main",
-      "sha": "55658dd5672a267804c05e69db1af97a70beeb00",
+      "sha": "9a3ab8f",
       "dependencies": {
         "packages": [
           "python3-pip"
