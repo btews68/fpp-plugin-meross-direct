@@ -213,6 +213,19 @@ def _online(device) -> str:
     return status.name if hasattr(status, "name") else str(status)
 
 
+def _make_meross_manager(http_client):
+    # meross-iot constructor signatures vary across versions.
+    try:
+        return MerossManager(http_client=http_client)
+    except TypeError:
+        pass
+    try:
+        return MerossManager(meross_cloud_client=http_client)
+    except TypeError:
+        pass
+    return MerossManager(http_client)
+
+
 async def _async_list_devices(email: str, password: str, api_url: str) -> int:
     timeout = max(5, _safe_int(os.environ.get("MEROSS_API_TIMEOUT", "30"), 30))
     manager = None
@@ -234,7 +247,7 @@ async def _async_list_devices(email: str, password: str, api_url: str) -> int:
         )
 
     try:
-        manager = MerossManager(meross_cloud_client=http_client)
+        manager = _make_meross_manager(http_client)
         await asyncio.wait_for(manager.async_init(), timeout=timeout)
         await asyncio.wait_for(manager.async_device_discovery(), timeout=timeout)
 
@@ -305,7 +318,7 @@ async def _async_control(
         )
 
     try:
-        manager = MerossManager(meross_cloud_client=http_client)
+        manager = _make_meross_manager(http_client)
         await asyncio.wait_for(manager.async_init(), timeout=timeout)
         await asyncio.wait_for(manager.async_device_discovery(), timeout=timeout)
 
