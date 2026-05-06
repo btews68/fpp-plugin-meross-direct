@@ -363,9 +363,17 @@ $pluginName = 'fpp-plugin-meross-direct';
 
   // ── Test buttons ──────────────────────────────────────────────────────────
   async function runAction(action, value) {
-    const deviceId = document.getElementById('defaultDevice').value.trim();
-    const body = { action };
-    if (deviceId) body.deviceId = deviceId;
+    let deviceId = document.getElementById('defaultDevice').value.trim();
+    if (!deviceId && discoveredDevices.length > 0) {
+      const online = discoveredDevices.find(d => String(d.online || '').toUpperCase() === 'ONLINE') || discoveredDevices[0];
+      deviceId = online.uuid;
+      showStatus({ ok: true, message: `No default device set — using first discovered: ${online.name} (${deviceId})` });
+    }
+    if (!deviceId) {
+      showStatus({ ok: false, message: 'No device selected. Run Discovery first or enter a Device UUID above.' });
+      return;
+    }
+    const body = { action, deviceId };
     if (value !== undefined && value !== '') body.value = String(value);
     showStatus(`Sending ${action}${value !== undefined ? ' ' + value : ''}...`);
     try {
