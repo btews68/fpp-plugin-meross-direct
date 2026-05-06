@@ -393,6 +393,16 @@ $pluginName = 'fpp-plugin-meross-direct';
   }
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────
+  document.getElementById('quickSelectDevice').addEventListener('change', function() {
+    const val = this.value;
+    if (!val) return;
+    const [uuid, channel] = val.split('|');
+    document.getElementById('defaultDevice').value  = uuid || '';
+    document.getElementById('defaultChannel').value = channel || '0';
+    const opt = this.options[this.selectedIndex];
+    showStatus({ ok: true, message: `Selected: ${opt.textContent}` });
+  });
+
   document.getElementById('saveBtn').addEventListener('click', saveSettings);
   document.getElementById('discoverBtn').addEventListener('click', discoverDevices);
   document.getElementById('testOnBtn').addEventListener('click', () => runAction('on'));
