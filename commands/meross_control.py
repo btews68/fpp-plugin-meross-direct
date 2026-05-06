@@ -12,6 +12,7 @@ Requires: meross-iot (installed by fpp_install.sh)
 import asyncio
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,10 +23,59 @@ PYTHON_LIB_DIR = Path(__file__).resolve().parents[1] / "python_libs"
 if PYTHON_LIB_DIR.exists():
     sys.path.insert(0, str(PYTHON_LIB_DIR))
 
-try:
-    from meross_iot.http_api import MerossHttpClient  # type: ignore
-    from meross_iot.manager import MerossManager  # type: ignore
-except ModuleNotFoundError:
+
+def _try_import_meross():
+    try:
+        from meross_iot.http_api import MerossHttpClient as _MerossHttpClient  # type: ignore
+        from meross_iot.manager import MerossManager as _MerossManager  # type: ignore
+        return _MerossHttpClient, _MerossManager
+    except ModuleNotFoundError:
+        return None, None
+
+
+def _bootstrap_meross_dependency() -> bool:
+    PYTHON_LIB_DIR.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--upgrade",
+        "--target",
+        str(PYTHON_LIB_DIR),
+        "meross-iot",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except Exception:
+        return False
+
+    if result.returncode == 0:
+        if str(PYTHON_LIB_DIR) not in sys.path:
+            sys.path.insert(0, str(PYTHON_LIB_DIR))
+        return True
+
+    # Retry for environments that require this flag.
+    cmd.insert(4, "--break-system-packages")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except Exception:
+        return False
+
+    if result.returncode == 0 and str(PYTHON_LIB_DIR) not in sys.path:
+        sys.path.insert(0, str(PYTHON_LIB_DIR))
+
+    return result.returncode == 0
+
+
+MerossHttpClient, MerossManager = _try_import_meross()
+if MerossHttpClient is None or MerossManager is None:
+    bootstrapped = _bootstrap_meross_dependency()
+    if bootstrapped:
+        MerossHttpClient, MerossManager = _try_import_meross()
+
+if MerossHttpClient is None or MerossManager is None:
     print(
         "Missing Python dependency 'meross-iot'. "
         "Run the plugin install script or install manually:\n"
