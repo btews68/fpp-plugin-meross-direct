@@ -11,10 +11,15 @@ Requires: meross-iot (installed by fpp_install.sh)
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Redirect all library logging to stderr so stdout stays clean JSON
+logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+logging.getLogger().setLevel(logging.WARNING)
 
 PLUGIN_NAME = "fpp-plugin-meross-direct"
 PLUGIN_CONFIG = Path("/home/fpp/media/config") / f"plugin.{PLUGIN_NAME}"
