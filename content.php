@@ -373,7 +373,8 @@ $pluginName = 'fpp-plugin-meross-direct';
       showStatus({ ok: false, message: 'No device selected. Run Discovery first or enter a Device UUID above.' });
       return;
     }
-    const body = { action, deviceId };
+    const channel = parseInt(document.getElementById('defaultChannel').value, 10);
+    const body = { action, deviceId, channel: isNaN(channel) ? 0 : channel };
     if (value !== undefined && value !== '') body.value = String(value);
     showStatus(`Sending ${action}${value !== undefined ? ' ' + value : ''}...`);
     try {

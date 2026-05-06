@@ -51,4 +51,5 @@ if [[ -z "$ACTION" ]]; then
     exit 2
 fi
 
-python3 "$PYTHON_SCRIPT" "$DEVICE_ID" "$ACTION" "$VALUE"
+# Forward any --channel N trailing args to the Python script
+python3 "$PYTHON_SCRIPT" "$DEVICE_ID" "$ACTION" "$VALUE" "${@}"  # passes leftover args like --channel N

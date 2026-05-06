@@ -297,6 +297,7 @@ function fpppluginmerossdirectRun() {
     $action   = isset($data['action'])   ? trim($data['action'])   : '';
     $deviceId = isset($data['deviceId']) ? trim($data['deviceId']) : '';
     $value    = isset($data['value'])    ? trim($data['value'])    : '';
+    $channel  = isset($data['channel'])  ? intval($data['channel']) : 0;
 
     if (empty($action)) {
         return json(array('ok' => false, 'error' => 'action is required'));
@@ -315,6 +316,8 @@ function fpppluginmerossdirectRun() {
     if (!empty($value)) {
         $args[] = escapeshellarg($value);
     }
+    $args[] = '--channel';
+    $args[] = escapeshellarg((string)$channel);
 
     $cmd = 'bash ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
 

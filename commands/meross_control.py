@@ -449,7 +449,20 @@ def main() -> int:
     if len(sys.argv) >= 2 and sys.argv[1] == "--list":
         return asyncio.run(_async_list_devices(email, password, api_url))
 
-    if len(sys.argv) < 3:
+    # Strip --channel N from argv before positional parsing
+    argv = sys.argv[1:]
+    channel_override: int | None = None
+    i = 0
+    filtered: list[str] = []
+    while i < len(argv):
+        if argv[i] == '--channel' and i + 1 < len(argv):
+            channel_override = _safe_int(argv[i + 1], 0)
+            i += 2
+        else:
+            filtered.append(argv[i])
+            i += 1
+
+    if len(filtered) < 2:
         die(
             "Usage:\n"
             "  meross_control.py --list\n"
@@ -457,11 +470,13 @@ def main() -> int:
             2,
         )
 
-    requested = sys.argv[1].strip()
-    action = sys.argv[2].strip().lower()
-    value = sys.argv[3] if len(sys.argv) > 3 else ""
+    requested = filtered[0].strip()
+    action = filtered[1].strip().lower()
+    value = filtered[2] if len(filtered) > 2 else ""
 
     uuid, channel, alias_used = resolve_device(requested, default_uuid, default_channel, aliases)
+    if channel_override is not None:
+        channel = channel_override
 
     if not uuid:
         die(
