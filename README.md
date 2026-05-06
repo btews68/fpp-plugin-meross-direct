@@ -4,6 +4,9 @@ Direct Meross smart-device control commands for [Falcon Player (FPP)](https://gi
 
 Control Meross smart plugs, power strips, and smart bulbs from FPP playlist actions and command presets.
 
+Copyright 2026 Bill Tews
+https://holidaypixelzone.com
+
 ---
 
 ## Requirements
