@@ -286,7 +286,7 @@ function fpppluginmerossdirectRun() {
     }
 
     $plugin = 'fpp-plugin-meross-direct';
-    $script = $settings['pluginDirectory'] . '/' . $plugin . '/commands/meross_action.sh';
+    $script = $settings['pluginDirectory'] . '/' . $plugin . '/commands/meross_control.py';
 
     $body = file_get_contents('php://input');
     $data = json_decode($body, true);
@@ -319,7 +319,7 @@ function fpppluginmerossdirectRun() {
     $args[] = '--channel';
     $args[] = escapeshellarg((string)$channel);
 
-    $cmd = 'bash ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
+    $cmd = 'python3 ' . escapeshellarg($script) . ' ' . implode(' ', $args) . ' 2>&1';
 
     $run = fpppluginmerossdirectRunCommand($cmd, 45);
     $rc = $run['rc'];

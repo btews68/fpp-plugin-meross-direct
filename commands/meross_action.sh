@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage:
-#   meross_action.sh <device_uuid_or_alias> <on|off|toggle|level|status> [value]
+#   meross_action.sh [--channel N] <device_uuid_or_alias> <on|off|toggle|level|status> [value]
 #   meross_action.sh <on|off|toggle|level|status> [value]
 #   meross_action.sh --list
 #
@@ -22,34 +22,46 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PYTHON_SCRIPT="$SCRIPT_DIR/meross_control.py"
 
-ARG1="${1:-}"
-ARG2="${2:-}"
-ARG3="${3:-}"
-
-if [[ "$ARG1" == "--list" ]]; then
+if [[ "${1:-}" == "--list" ]]; then
     python3 "$PYTHON_SCRIPT" --list
     exit 0
 fi
 
-case "$ARG1" in
+# Parse --channel N and collect positional args separately
+CHANNEL_ARG=()
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --channel)
+            CHANNEL_ARG=(--channel "$2")
+            shift 2
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Determine DEVICE_ID, ACTION, VALUE from positional args
+case "${POSITIONAL[0]:-}" in
     on|off|toggle|level|status)
         DEVICE_ID=""
-        ACTION="$ARG1"
-        VALUE="$ARG2"
+        ACTION="${POSITIONAL[0]:-}"
+        VALUE="${POSITIONAL[1]:-}"
         ;;
     *)
-        DEVICE_ID="$ARG1"
-        ACTION="$ARG2"
-        VALUE="$ARG3"
+        DEVICE_ID="${POSITIONAL[0]:-}"
+        ACTION="${POSITIONAL[1]:-}"
+        VALUE="${POSITIONAL[2]:-}"
         ;;
 esac
 
 if [[ -z "$ACTION" ]]; then
-    echo "Usage: $0 <device_uuid_or_alias> <on|off|toggle|level|status> [value]"
-    echo "   or: $0 <on|off|toggle|level|status> [value]"
+    echo "Usage: $0 [--channel N] <device_uuid_or_alias> <on|off|toggle|level|status> [value]"
+    echo "   or: $0 [--channel N] <on|off|toggle|level|status> [value]"
     echo "   or: $0 --list"
     exit 2
 fi
 
-# Forward any --channel N trailing args to the Python script
-python3 "$PYTHON_SCRIPT" "$DEVICE_ID" "$ACTION" "$VALUE" "${@}"  # passes leftover args like --channel N
+python3 "$PYTHON_SCRIPT" "$DEVICE_ID" "$ACTION" "$VALUE" "${CHANNEL_ARG[@]+"${CHANNEL_ARG[@]}"}"
