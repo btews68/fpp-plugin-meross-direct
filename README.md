@@ -85,6 +85,10 @@ bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh 
 # Turn off default device
 bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh off
 
+# Control a specific channel on a power strip (--channel N)
+bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh <uuid> on --channel 1
+bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh <uuid> off --channel 2
+
 # Dim a smart bulb to 60%
 bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh TreeBulb level 60
 
@@ -92,11 +96,23 @@ bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh 
 bash /home/fpp/media/plugins/fpp-plugin-meross-direct/commands/meross_action.sh --list
 ```
 
+> **Channel 0** is the master switch on power strips and controls all outlets simultaneously.
+> Use channel 1, 2, 3… to target individual outlets independently.
+
+### FPP Command Presets
+
+In the FPP UI under **Content Setup → Commands**, add a **Run Script** command pointing to `meross_action.sh` with arguments. Example for a power strip outlet:
+
+```
+Script:    meross_action.sh
+Arguments: 24071156886246570901c4e7ae0704fc on --channel 1
+```
+
 ### Helper scripts (available in FPP Script dropdowns)
 
 ```bash
-meross_on.sh  [alias_or_uuid]
-meross_off.sh [alias_or_uuid]
+meross_on.sh  [alias_or_uuid] [--channel N]
+meross_off.sh [alias_or_uuid] [--channel N]
 meross_dim.sh <0-100> [alias_or_uuid]
 ```
 
@@ -104,16 +120,35 @@ meross_dim.sh <0-100> [alias_or_uuid]
 
 ## Supported devices
 
-| Model | Type | on/off | level |
-|---|---|---|---|
-| MSS110 | Smart Plug (mini) | ✓ | — |
-| MSS210 | Smart Plug (2-outlet) | ✓ | — |
-| MSS310 | Smart Plug (energy monitor) | ✓ | — |
-| MSS425 | Power Strip (4 channels) | ✓ (per channel) | — |
-| MSS620 | Outdoor Smart Plug | ✓ | — |
-| MSL120 | Smart Bulb (RGB) | ✓ | ✓ |
+Tested working:
 
-Any device supported by the `meross-iot` library should work for `on`/`off`/`toggle`. The `level` action requires a device that supports `async_set_light_color`.
+| Model | Type | on/off per channel | Notes |
+|---|---|---|---|
+| MSS620 | Outdoor Power Strip (2 outlets) | ✓ | Confirmed: ch1 and ch2 independently controlled |
+
+Any device supported by the [`meross-iot`](https://github.com/albertogeniola/MerossIot) library should work for `on`/`off`/`toggle`. The `level` action requires a device with `async_set_light_color` support (smart bulbs).
+
+Likely compatible (untested):
+
+| Model | Type |
+|---|---|
+| MSS110 | Smart Plug (mini) |
+| MSS210 | Smart Plug (2-outlet) |
+| MSS310 | Smart Plug (energy monitor) |
+| MSS425 | Power Strip (4 channels) |
+| MSL120 | Smart Bulb (RGB) |
+
+---
+
+## Beta testing
+
+This plugin is in **beta**. If you test it, please report issues at:
+https://github.com/btews68/fpp-plugin-meross-direct/issues
+
+Include:
+- Your FPP version and hardware (Pi model)
+- Your Meross device model
+- The full JSON response from the plugin UI status box
 
 ---
 
