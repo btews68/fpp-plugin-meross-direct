@@ -18,8 +18,52 @@ function getEndpointsfpppluginmerossdirect() {
     return $result;
 }
 
+function fpppluginmerossdirectEnsureDependencies() {
+    global $settings;
+
+    $plugin = 'fpp-plugin-meross-direct';
+    $pluginDir = $settings['pluginDirectory'] . '/' . $plugin;
+    $moduleDir = $pluginDir . '/python_libs/meross_iot';
+
+    if (is_dir($moduleDir)) {
+        return array('ok' => true, 'installed' => true, 'message' => 'Dependencies already present');
+    }
+
+    $installScript = $pluginDir . '/scripts/fpp_install.sh';
+    if (!file_exists($installScript)) {
+        return array(
+            'ok' => false,
+            'error' => 'Install script not found',
+            'path' => $installScript,
+        );
+    }
+
+    $cmd = 'bash ' . escapeshellarg($installScript) . ' 2>&1';
+    $output = array();
+    $rc = 0;
+    exec($cmd, $output, $rc);
+    $raw = implode("\n", $output);
+
+    clearstatcache();
+    if ($rc !== 0 || !is_dir($moduleDir)) {
+        return array(
+            'ok' => false,
+            'error' => 'Unable to install meross-iot dependency',
+            'rc' => $rc,
+            'output' => $raw,
+        );
+    }
+
+    return array('ok' => true, 'installed' => true, 'message' => 'Dependencies installed');
+}
+
 function fpppluginmerossdirectDevices() {
     global $settings;
+
+    $deps = fpppluginmerossdirectEnsureDependencies();
+    if (!$deps['ok']) {
+        return json($deps);
+    }
 
     $plugin = 'fpp-plugin-meross-direct';
     $script = $settings['pluginDirectory'] . '/' . $plugin . '/commands/meross_control.py';
@@ -44,6 +88,11 @@ function fpppluginmerossdirectDevices() {
 
 function fpppluginmerossdirectRun() {
     global $settings;
+
+    $deps = fpppluginmerossdirectEnsureDependencies();
+    if (!$deps['ok']) {
+        return json($deps);
+    }
 
     $plugin = 'fpp-plugin-meross-direct';
     $script = $settings['pluginDirectory'] . '/' . $plugin . '/commands/meross_action.sh';
